@@ -1,10 +1,6 @@
 .MODEL SMALL
 .STACK 100H
 
-; =========================================================================
-; [하드웨어 포트 주소 정의] 
-; 나중에 팀원이 회로를 완성하면 이 주소 숫자만 바꾸면 됩니다!
-; =========================================================================
 MOTOR_PORT      EQU     00H     ; 보일러 모터 제어 포트
 LCD_CMD_PORT    EQU     10H     ; LCD 명령어 제어 포트
 LCD_DATA_PORT   EQU     12H     ; LCD 텍스트 출력 포트
@@ -40,9 +36,7 @@ MAIN PROC
     ; --- 2. LCD 초기화 프로시저 호출 ---
     CALL INIT_LCD
 
-; =========================================================================
-; ?? [미완성 대기중이었던 진짜 메인 제어 루프]
-; =========================================================================
+
 MAIN_LOOP:
     INT 08H                     ; [테스트용] 타이머 인터럽트 강제 발생
 
@@ -57,6 +51,7 @@ MAIN_LOOP:
 
     ; --- LCD 실시간 모니터링 로직 ---
     ; 루프가 돌 때마다 LCD 화면에 현재 온도를 지속적으로 업데이트합니다.
+    CALL CALCULATE_AVERAGE
     CALL DISPLAY_STATUS_LCD
 
     JMP MAIN_LOOP               
@@ -79,9 +74,7 @@ TURN_ON_BOILER:
 
 MAIN ENDP
 
-; =========================================================================
-; ?? [새로 추가된 LCD 제어 로직]
-; =========================================================================
+
 INIT_LCD PROC
     ; LCD를 켜고 8비트 모드로 설정하는 초기화 명령을 내보냅니다.
     MOV AL, 38H                 ; 기능 설정 (8비트, 2줄, 5x7 도트)
@@ -108,9 +101,7 @@ DISPLAY_STATUS_LCD PROC
     RET
 DISPLAY_STATUS_LCD ENDP
 
-; =========================================================================
-; 타이머 인터럽트 서비스 루틴
-; =========================================================================
+
 TIMER_ISR PROC
     PUSH AX                     
     PUSH BX
@@ -142,5 +133,35 @@ SAVE_INDEX:
     POP AX
     IRET                        
 TIMER_ISR ENDP
+
+
+CALCULATE_AVERAGE PROC
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH SI
+
+    XOR AX, AX                  ; 합계를 누적할 AX 초기화
+    MOV CX, 10                  ; 루프 10번 반복 설정
+    XOR SI, SI                  ; 배열 인덱스(SI) 0으로 초기화
+
+SUM_LOOP:
+    XOR BX, BX
+    MOV BL, TEMP_LOG[SI]        ; 배열에서 온도 값을 하나 꺼냄
+    ADD AX, BX                  ; 누적 합계 계산
+    INC SI
+    LOOP SUM_LOOP
+
+    ; --- 평균 내기 (총합 / 10) ---
+    MOV CL, 10
+    DIV CL                      ; 총합(AX)을 10으로 나눔. 몫은 AL에 들어감
+    MOV AVG_TEMP, AL            ; 최종 평균값(몫)을 변수에 저장
+
+    POP SI
+    POP CX
+    POP BX
+    POP AX
+    RET
+CALCULATE_AVERAGE ENDP
 
 END MAIN
